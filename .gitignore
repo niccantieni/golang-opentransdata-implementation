@@ -1,5 +1,10 @@
 % ignore GoLand
 .idea
 
+%ignor VSCode
+.vscode
+
+
 % ignore .env for storing API-Key etc.
 .env
+
