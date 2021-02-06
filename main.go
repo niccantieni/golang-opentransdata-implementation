@@ -6,17 +6,15 @@ import (
 	"github.com/niccantieni/opentransdata"
 	"log"
 	"os"
-	"strings"
 	"time"
 )
 
 var (
-	OTDApiKey = goDotEnvVariable("APIKEY_TRANSDATA")
-	stationID = "8509184"
+	OTDApiKey        = goDotEnvVariable("APIKEY_TRANSDATA")
+	stationIDBonaduz = "8509184"
 )
 
 func goDotEnvVariable(key string) string {
-
 	err := godotenv.Load(".env")
 
 	if err != nil {
@@ -27,31 +25,36 @@ func goDotEnvVariable(key string) string {
 }
 
 func main() {
-	//set time for request (point of time of interest)
-	now := time.Now()
-	//Format time as 2021-04-13T22:10:56Z, in OTD interpreted as Zulu (UTC)
-	depArrTime := strings.Split(now.Format(time.RFC3339), "+")[0]
+	//Load Location in Zürich, everything else does not make much sense
+	zurich, err := time.LoadLocation("Europe/Zurich")
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	//current time in Zurich
+	now := time.Now().In(zurich)
+
+	//format timestamp as timestamp correctly; OTD interprets this as localtime (somehow, but not really?!?)
+	// whatever, it works like this to get the current (as in right now, instant) events.
+	depArrTime := now.Format(opentransdata.ShortRFC3339)
 
 	//create request model
-	req := opentransdata.NewOTDRequest("", stationID, depArrTime)
+	req := opentransdata.NewOTDRequest("", stationIDBonaduz, depArrTime, "5",
+		"departure", true, true, true)
 
-	//set parameters
-	req.Parameters.IncludeRealtimeData = true
-	req.Parameters.IncludeOnwardCalls = true
-	req.Parameters.IncludePreviousCalls = true
-	req.Parameters.NumberOfResults = "5"
-
-	//Create and send the Request
+	//Create and send the request
 	resp, data, err := opentransdata.CreateRequest(OTDApiKey, req)
 	if err != nil {
 		fmt.Println(resp, err)
 	}
-	fmt.Println(string(data))
+	//fmt.Println(string(data))
 
+	//parse the response
 	struc, err := opentransdata.ParseXML(data)
 	if err != nil {
 		fmt.Println(err)
 	}
-	fmt.Println(struc)
 
+	check := struc.ServiceDelivery.DeliveryPayload.StopEventResponse.StopEventResult[0].StopEvent.ThisCall.CallAtStop
+	fmt.Println(check)
 }
