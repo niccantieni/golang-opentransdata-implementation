@@ -6,7 +6,6 @@ import (
 	"github.com/niccantieni/opentransdata"
 	"log"
 	"os"
-	"time"
 )
 
 var (
@@ -25,36 +24,36 @@ func goDotEnvVariable(key string) string {
 }
 
 func main() {
-	//Load Location in Zürich, everything else does not make much sense
-	zurich, err := time.LoadLocation("Europe/Zurich")
-	if err != nil {
-		fmt.Println(err)
-	}
+	trias, _ := getTriasNow(stationIDBonaduz)
+	stop := getNextDeparture(trias)
 
-	//current time in Zurich
-	now := time.Now().In(zurich)
+	txt := stop.Service.PublishedLineName.Text
+	time := stop.ThisCall.CallAtStop.ServiceDeparture.TimetabledTime.String
+	fmt.Println(txt, time)
+}
 
-	//format timestamp as timestamp correctly; OTD interprets this as localtime (somehow, but not really?!?)
-	// whatever, it works like this to get the current (as in right now, instant) events.
-	depArrTime := now.Format(opentransdata.ShortRFC3339)
+func getTriasNow(stationID string) (trias opentransdata.Trias, err error) {
 
-	//create request model
-	req := opentransdata.NewOTDRequest("", stationIDBonaduz, depArrTime, "5",
-		"departure", true, true, true)
+	request := opentransdata.TemplateOTDRequestNow()
+	request.StopPointRef = stationID
 
 	//Create and send the request
-	resp, data, err := opentransdata.CreateRequest(OTDApiKey, req)
+	data, err := opentransdata.CreateRequest(OTDApiKey, request)
 	if err != nil {
-		fmt.Println(resp, err)
+		return trias, err
 	}
-	//fmt.Println(string(data))
 
 	//parse the response
-	struc, err := opentransdata.ParseXML(data)
+	trias, err = opentransdata.ParseXML(data)
 	if err != nil {
-		fmt.Println(err)
+		return trias, err
 	}
 
-	check := struc.ServiceDelivery.DeliveryPayload.StopEventResponse.StopEventResult[0].StopEvent.ThisCall.CallAtStop
-	fmt.Println(check)
+	return trias, err
+}
+
+func getNextDeparture(trias opentransdata.Trias) (nextDeparture opentransdata.StopEvent) {
+	nextDeparture = trias.ServiceDelivery.DeliveryPayload.StopEventResponse.StopEventResult[0].StopEvent
+
+	return nextDeparture
 }
